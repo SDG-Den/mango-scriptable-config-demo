@@ -20,8 +20,6 @@ let
     gappih=6
     gappiv=6
     borderpx=3
-    bind=alt,Return,spawn_shell,foot
-    bind=alt,q,quit
     exec-once=${driver}/bin/mango-config
   '';
   wrapper = writeShellScriptBin "mango-demo" "exec ${mangoPkg}/bin/mango -c ${conf}";

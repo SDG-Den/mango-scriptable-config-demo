@@ -46,7 +46,7 @@
             "Ctrl,2,view,2"
             "Ctrl,3,view,3"
             "Ctrl,4,view,4"
-            "alt+Shift,q,quit"
+            "alt,q,killclient"
             "alt,f,togglefullscreen"))
 
 (set-option "mousebind" "alt,btn_left,moveresize,curmove")

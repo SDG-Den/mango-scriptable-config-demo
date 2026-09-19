@@ -44,7 +44,7 @@ const onFocus = (event) => {
     "Ctrl,2,view,2",
     "Ctrl,3,view,3",
     "Ctrl,4,view,4",
-    "alt+Shift,q,quit",
+    "alt,q,killclient",
     "alt,f,togglefullscreen",
   ]) {
     await mango.setOption("bind", bind);
@@ -64,33 +64,51 @@ const onFocus = (event) => {
   console.log("dispatch setlayout tile -> ok");
 
   const GAP = { oh: 10, ov: 10, ih: 6, iv: 6 };
-  const RATIO = 0.5;
+  const DIRS = { 0: "up", 1: "right", 2: "down", 3: "left" };
 
-  const splitH = (region) => region[2] >= region[3];
-  const half = (size) => Math.round(size * RATIO) - 3;
-
-  const dwindle = (count, mon) => {
-    const area = [mon.x + GAP.oh, mon.y + GAP.ov, mon.width - 2 * GAP.oh, mon.height - 2 * GAP.ov];
-    const open = [area.slice()];
-    const slots = [];
-    for (let i = 0; i < count; i++) {
-      if (i === count - 1) {
-        slots.push(open.pop());
-        continue;
-      }
-      const r = open[open.length - 1];
-      const wide = splitH(r);
-      if (wide) {
-        const w1 = half(r[2]);
-        slots.push([r[0], r[1], w1, r[3]]);
-        open.push([r[0] + w1 + GAP.ih, r[1], r[2] - w1 - GAP.ih, r[3]]);
+  // Builds the fibonacci spiral in normalized units on a golden box that starts
+  // at 1x1: each new square's side equals the box's perpendicular dimension,
+  // attached on the side given by DIRS, growing the box. Sides come out
+  // 1, 1, 2, 3, 5, 8... tiling golden rectangles (13x8, 13x21, 34x21) exactly.
+  const buildSquares = (count) => {
+    const box = { x: 0, y: 0, w: 1, h: 1 };
+    const sqs = [{ x: 0, y: 0, w: 1, h: 1 }];
+    for (let k = 1; k < count; k++) {
+      const d = DIRS[k % 4];
+      if (d === "right") {
+        sqs.push({ x: box.x + box.w, y: box.y, w: box.h, h: box.h });
+        box.w += box.h;
+      } else if (d === "down") {
+        sqs.push({ x: box.x, y: box.y + box.h, w: box.w, h: box.w });
+        box.h += box.w;
+      } else if (d === "left") {
+        sqs.push({ x: box.x - box.h, y: box.y, w: box.h, h: box.h });
+        box.x -= box.h;
+        box.w += box.h;
       } else {
-        const h1 = half(r[3]);
-        slots.push([r[0], r[1], r[2], h1]);
-        open.push([r[0], r[1] + h1 + GAP.iv, r[2], r[3] - h1 - GAP.iv]);
+        sqs.push({ x: box.x, y: box.y - box.w, w: box.w, h: box.w });
+        box.y -= box.w;
+        box.h += box.w;
       }
     }
-    return slots;
+    return { sqs, box };
+  };
+
+  // Scales the normalized spiral onto the monitor's usable area via independent
+  // X/Y scaling, so every client keeps the same stretched aspect ratio and the
+  // whole area is covered with no overlap. Rebuilding from surviving ids
+  // self-heals when windows are killed.
+  const fibSlots = (count, mon) => {
+    const W = mon.width - 2 * GAP.oh;
+    const H = mon.height - 2 * GAP.ov;
+    const { sqs, box } = buildSquares(count);
+    return sqs.map((q) => {
+      const left = Math.round(mon.x + GAP.oh + ((q.x - box.x) * W) / box.w);
+      const top = Math.round(mon.y + GAP.ov + ((q.y - box.y) * H) / box.h);
+      const right = Math.round(mon.x + GAP.oh + ((q.x - box.x + q.w) * W) / box.w);
+      const bottom = Math.round(mon.y + GAP.ov + ((q.y - box.y + q.h) * H) / box.h);
+      return [left, top, right - left, bottom - top];
+    });
   };
 
   const layout = async () => {
@@ -98,7 +116,7 @@ const onFocus = (event) => {
     const clients = (data(await mango.get("all-clients")).clients || []).filter((c) => !c.is_swallowing).sort((a, b) => a.id - b.id);
     if (!mons.length || !clients.length) return;
     const mon = mons[0];
-    const slots = dwindle(clients.length, mon);
+    const slots = fibSlots(clients.length, mon);
     for (let i = 0; i < clients.length; i++) {
       const c = clients[i];
       const [x, y, w, h] = slots[i];
