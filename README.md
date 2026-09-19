@@ -21,3 +21,4 @@ and a `mango-demo` binary that launches it with `minimal.conf`.
 
 each demo comes with a custom layout being handled by the scriptable config.
 
+ruby - brick-wall style pattern
