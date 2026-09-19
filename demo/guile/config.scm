@@ -64,19 +64,24 @@
 
 (display "watching all-clients (layout engine)") (newline)
 
+(define gap-oh 10)
+(define gap-ov 10)
+(define gap-ih 6)
+(define gap-iv 6)
+
 (define (serpentine-slot i cols rows cw ch ox oy)
   (let* ((row (quotient i cols))
          (col (remainder i cols))
          (zcol (if (odd? row) (- cols 1 col) col)))
-    (list (+ ox (* zcol (+ cw 20)))
-          (+ oy (* row (+ ch 20)))
+    (list (+ ox (* zcol (+ cw gap-ih)))
+          (+ oy (* row (+ ch gap-iv)))
           cw ch)))
 
 (define (serpentine-slots count mw mh ox oy)
   (let* ((cols (if (> count 0) (min 3 count) 1))
          (rows (if (> count 0) (ceiling (/ count cols)) 1))
-         (cw (quotient mw cols))
-         (ch (quotient mh rows)))
+         (cw (quotient (- mw (* 2 gap-oh) (* (- cols 1) gap-ih)) cols))
+         (ch (quotient (- mh (* 2 gap-ov) (* (- rows 1) gap-iv)) rows)))
     (map (lambda (i) (serpentine-slot i cols rows cw ch ox oy))
          (iota count))))
 
@@ -94,7 +99,8 @@
              (mw (assoc-ref mon "width"))
              (mh (assoc-ref mon "height"))
              (clients (sort clients (lambda (a b) (< (assoc-ref a "id") (assoc-ref b "id")))))
-             (slots (serpentine-slots (length clients) mw mh ox oy)))
+             (slots (serpentine-slots (length clients) mw mh
+                                      (+ ox gap-oh) (+ oy gap-ov))))
         (let loop ((clients clients) (slots slots))
           (when (pair? clients)
             (let* ((c (car clients))

@@ -63,16 +63,32 @@ const onFocus = (event) => {
   await mango.dispatch("setlayout", "tile");
   console.log("dispatch setlayout tile -> ok");
 
-  const spiral = (count, mon) => {
-    const cx = mon.x + mon.width / 2;
-    const cy = mon.y + mon.height / 2;
+  const GAP = { oh: 10, ov: 10, ih: 6, iv: 6 };
+  const RATIO = 0.5;
+
+  const splitH = (region) => region[2] >= region[3];
+  const half = (size) => Math.round(size * RATIO) - 3;
+
+  const dwindle = (count, mon) => {
+    const area = [mon.x + GAP.oh, mon.y + GAP.ov, mon.width - 2 * GAP.oh, mon.height - 2 * GAP.ov];
+    const open = [area.slice()];
     const slots = [];
     for (let i = 0; i < count; i++) {
-      const r = 0.28 * Math.min(mon.width, mon.height) * Math.sqrt((i + 1) / count);
-      const a = i * 0.9 + 1.2;
-      const w = Math.max(320, 640 - i * 40);
-      const h = Math.max(220, 440 - i * 30);
-      slots.push([Math.round(cx + r * Math.cos(a)) - w / 2, Math.round(cy + r * Math.sin(a)) - h / 2, w, h]);
+      if (i === count - 1) {
+        slots.push(open.pop());
+        continue;
+      }
+      const r = open[open.length - 1];
+      const wide = splitH(r);
+      if (wide) {
+        const w1 = half(r[2]);
+        slots.push([r[0], r[1], w1, r[3]]);
+        open.push([r[0] + w1 + GAP.ih, r[1], r[2] - w1 - GAP.ih, r[3]]);
+      } else {
+        const h1 = half(r[3]);
+        slots.push([r[0], r[1], r[2], h1]);
+        open.push([r[0], r[1] + h1 + GAP.iv, r[2], r[3] - h1 - GAP.iv]);
+      }
     }
     return slots;
   };
@@ -82,7 +98,7 @@ const onFocus = (event) => {
     const clients = (data(await mango.get("all-clients")).clients || []).filter((c) => !c.is_swallowing).sort((a, b) => a.id - b.id);
     if (!mons.length || !clients.length) return;
     const mon = mons[0];
-    const slots = spiral(clients.length, mon);
+    const slots = dwindle(clients.length, mon);
     for (let i = 0; i < clients.length; i++) {
       const c = clients[i];
       const [x, y, w, h] = slots[i];

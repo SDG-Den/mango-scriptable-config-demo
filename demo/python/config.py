@@ -71,13 +71,21 @@ print("watching all-clients (layout engine)")
 def fan_slots(count, mon):
     cx = mon["x"] + mon["width"] / 2
     cy = mon["y"] + mon["height"] / 2
-    r = min(mon["width"], mon["height"]) * 0.35
-    w, h = 560, 360
+    w, h = 520, 420
+    r = 0.30 * min(mon["width"], mon["height"])
+    span = 1.05
     slots = []
     for i in range(count):
-        a = -math.pi / 2 + (math.pi / max(count - 1, 1)) * i
-        slots.append((round(cx + r * math.cos(a) - w / 2), round(cy + r * math.sin(a) - h / 2), w, h))
-    return slots
+        a = -math.pi / 2 - span + 2 * span * i / max(count - 1, 1)
+        slots.append((cx + r * math.cos(a) - w / 2, cy + r * math.sin(a) - h / 2, w, h))
+    minx = min(s[0] for s in slots)
+    miny = min(s[1] for s in slots)
+    maxx = max(s[0] + s[2] for s in slots)
+    dx = mon["x"] + 10 - minx
+    dy = mon["y"] + 10 - miny
+    if maxx + dx > mon["x"] + mon["width"] - 10:
+        dx -= maxx + dx - (mon["x"] + mon["width"] - 10)
+    return [(round(x + dx), round(y + dy), w, h) for x, y, w, h in slots]
 
 
 def layout_pass():

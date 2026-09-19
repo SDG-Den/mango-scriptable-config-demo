@@ -60,13 +60,28 @@ puts "dispatch setlayout tile -> ok"
 
 puts "watching all-clients (layout engine)"
 
-def staircase_slots(count, mon)
-  cx = mon["x"] + mon["width"] / 2
-  cy = mon["y"] + mon["height"] / 2
+def brick_slots(count, mon)
+  goh, gov, gih, giv = 10, 10, 6, 6
+  fulls = 3
+  per_row = fulls + 1
+  rows = (count.to_f / per_row).ceil
+  aw = mon["width"] - 2 * goh
+  ah = mon["height"] - 2 * gov
+  bw = (aw - fulls * gih) / (fulls + 0.5)
+  bh = (ah - (rows - 1) * giv) / rows
+  half = bw / 2
   count.times.map do |i|
-    w = [560 - i * 24, 240].max
-    h = [360 - i * 20, 160].max
-    [cx - w / 2 + i * 60, cy - h / 2 + i * 60, w, h]
+    r = i / per_row
+    c = i % per_row
+    if r.even?
+      x = mon["x"] + goh + c * (bw + gih)
+      w = (c == per_row - 1) ? half : bw
+    else
+      x = mon["x"] + goh + ((c == 0) ? 0 : half + (c - 1) * (bw + gih) + gih)
+      w = (c == 0) ? half : bw
+    end
+    y = mon["y"] + gov + r * (bh + giv)
+    [x.round, y.round, w.round - 1, bh.round - 1]
   end
 end
 
@@ -76,7 +91,7 @@ Mango.watch("all-clients") do |_event|
   next if mons.empty? || clients.empty?
 
   mon = mons.first
-  clients.zip(staircase_slots(clients.size, mon)).each do |c, (x, y, w, h)|
+  clients.zip(brick_slots(clients.size, mon)).each do |c, (x, y, w, h)|
     next if c["x"] == x && c["y"] == y && c["width"] == w && c["height"] == h
 
     Mango.dispatch("movewin", "#{x},#{y}", "client,#{c['id']}")

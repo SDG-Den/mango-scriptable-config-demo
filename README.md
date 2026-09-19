@@ -18,7 +18,6 @@ the socket path from `MANGO_INSTANCE_SIGNATURE`:
 `nix run .#python` builds the mango compositor (from the `mango` flake input)
 and a `mango-demo` binary that launches it with `minimal.conf`.
 
-Point the demo at another mango source:
 
-    $ nix run . --override-input mango github:mangowm/mango
+each demo comes with a custom layout being handled by the scriptable config.
 

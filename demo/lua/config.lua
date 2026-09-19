@@ -69,22 +69,33 @@ print("dispatch setlayout tile -> ok")
 
 print("watching all-clients (layout engine)")
 
-local function pinwheel_slots(count, mon)
-  local cx = mon.x + mon.width / 2
-  local cy = mon.y + mon.height / 2
-  local w, h = 620, 400
-  local slots = {}
-  for i = 1, count do
-    local quad, ring = (i - 1) % 4, math.floor((i - 1) / 4)
-    local ofs = 120 + ring * 120
-    local x, y
-    if quad == 0 then x, y = cx + ofs, cy - h / 2 end
-    if quad == 1 then x, y = cx - ofs, cy - h / 2 end
-    if quad == 2 then x, y = cx - ofs, cy + h / 2 end
-    if quad == 3 then x, y = cx + ofs, cy + h / 2 end
-    slots[i] = { math.floor(x - w / 2), math.floor(y), w, h }
+local GOH, GOV, GIH, GIV = 10, 10, 6, 6
+
+local function pinwheel(x, y, w, h, count, out)
+  if count == 0 then return end
+  if count == 1 then
+    out[#out + 1] = { math.floor(x), math.floor(y), math.floor(w), math.floor(h) }
+    return
   end
-  return slots
+  local gw = (w - GIH) / 2
+  local gh = (h - GIV) / 2
+  local quads = {
+    { x, y, gw, gh },
+    { x + gw + GIH, y, gw, gh },
+    { x + gw + GIH, y + gh + GIV, gw, gh },
+    { x, y + gh + GIV, gw, gh },
+  }
+  for i = 1, 4 do
+    local q = quads[i]
+    local qn = (i < 4) and 1 or math.max(0, count - 3)
+    if qn > 0 then pinwheel(q[1], q[2], q[3], q[4], qn, out) end
+  end
+end
+
+local function pinwheel_slots(count, mon)
+  local out = {}
+  pinwheel(mon.x + GOH, mon.y + GOV, mon.width - 2 * GOH, mon.height - 2 * GOV, count, out)
+  return out
 end
 
 mango.watch("all-clients", function(_event)
