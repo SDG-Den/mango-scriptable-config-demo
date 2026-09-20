@@ -1,4 +1,5 @@
 local json = require("cjson")
+local socket = require("socket")
 local mango = require("mango")
 
 local function data(reply)
@@ -51,6 +52,13 @@ local binds = {
   "Ctrl,4,view,4",
   "alt,q,killclient",
   "alt,f,togglefullscreen",
+  "alt,equal,setkeymode,zoomin",
+  "alt,minus,setkeymode,zoomout",
+  "alt,Left,setkeymode,panleft",
+  "alt,Right,setkeymode,panright",
+  "alt,Up,setkeymode,panup",
+  "alt,Down,setkeymode,pandown",
+  "alt,r,setkeymode,resetview",
 }
 for _, bind in ipairs(binds) do mango.set_option("bind", bind) end
 
@@ -67,50 +75,254 @@ print("rules: " .. count(mango.get("rules")))
 mango.dispatch("setlayout", "tile")
 print("dispatch setlayout tile -> ok")
 
-print("watching all-clients (layout engine)")
+print("watching all-clients + keymode (pseudo-infinite canvas)")
 
-local GOH, GOV, GIH, GIV = 10, 10, 6, 6
+local GAP = 4
+local PAN = 80
+local ZOOM = 1.35
+local SCALE_MIN = 0.2
+local SCALE_MAX = 4.0
 
-local function pinwheel(x, y, w, h, count, out)
-  if count == 0 then return end
-  if count == 1 then
-    out[#out + 1] = { math.floor(x), math.floor(y), math.floor(w), math.floor(h) }
-    return
-  end
-  local gw = (w - GIH) / 2
-  local gh = (h - GIV) / 2
-  local quads = {
-    { x, y, gw, gh },
-    { x + gw + GIH, y, gw, gh },
-    { x + gw + GIH, y + gh + GIV, gw, gh },
-    { x, y + gh + GIV, gw, gh },
-  }
-  for i = 1, 4 do
-    local q = quads[i]
-    local qn = (i < 4) and 1 or math.max(0, count - 3)
-    if qn > 0 then pinwheel(q[1], q[2], q[3], q[4], qn, out) end
-  end
+local cam = { s = 1.0, ox = 0, oy = 0 }
+local rel = {}
+local cam_dirty = false
+local last_focus = nil
+
+local function clamp(v, lo, hi)
+  if v < lo then return lo end
+  if v > hi then return hi end
+  return v
 end
 
-local function pinwheel_slots(count, mon)
-  local out = {}
-  pinwheel(mon.x + GOH, mon.y + GOV, mon.width - 2 * GOH, mon.height - 2 * GOV, count, out)
-  return out
-end
-
-mango.watch("all-clients", function(_event)
+local function monitor()
   local mons = data(mango.get("all-monitors")).monitors or {}
-  local clients = data(mango.get("all-clients")).clients or {}
-  if #mons == 0 or #clients == 0 then return end
-  local mon = mons[1]
-  table.sort(clients, function(a, b) return a.id < b.id end)
-  for i = 1, #clients do
-    local c = clients[i]
-    local slot = pinwheel_slots(#clients, mon)[i]
-    local x, y, w, h = slot[1], slot[2], slot[3], slot[4]
-    if c.x ~= x or c.y ~= y or c.width ~= w or c.height ~= h then
-      mango.dispatch("movewin", x .. "," .. y, "client," .. c.id)
-      mango.dispatch("resizewin", w .. "," .. h, "client," .. c.id)
+  return mons[1]
+end
+
+local function cursor()
+  local ok, pos = pcall(mango.get, "cursorpos")
+  if ok then return pos end
+  return nil
+end
+
+local function layoutable(c)
+  return not c.is_swallowing and not c.is_fullscreen and not c.is_maximized
+end
+
+local function sig(n)
+  return (n >= 0 and "+" or "") .. n
+end
+
+local function pred(r)
+  return math.floor(cam.ox + r.rx * cam.s),
+         math.floor(cam.oy + r.ry * cam.s),
+         math.max(1, math.floor(r.rw * cam.s)),
+         math.max(1, math.floor(r.rh * cam.s))
+end
+
+local function nearest_sided(clients, px, py)
+  local best, best_d, side = nil, math.huge, "right"
+  for _, c in ipairs(clients) do
+    if rel[c.id] then
+      local cx = c.x + c.width / 2
+      local cy = c.y + c.height / 2
+      local dx = px - cx
+      local dy = py - cy
+      local d = dx * dx + dy * dy
+      if d < best_d then
+        best, best_d = c, d
+        if math.abs(dx) >= math.abs(dy) then
+          side = dx >= 0 and "right" or "left"
+        else
+          side = dy >= 0 and "down" or "up"
+        end
+      end
     end
   end
-end)
+  return best, side
+end
+
+local function adopt(c, clients)
+  local pos = cursor()
+  local p, side = nil, "right"
+
+  local ok, foc = pcall(mango.get, "focusing-client")
+  local target_id = ok and foc and foc.id or nil
+  if target_id == c.id then target_id = last_focus end
+  if target_id then
+    for _, o in ipairs(clients) do
+      if o.id == target_id then p = o break end
+    end
+    if p and pos then
+      local fx = p.x + p.width / 2
+      local fy = p.y + p.height / 2
+      local dx = pos.x - fx
+      local dy = pos.y - fy
+      if math.abs(dx) >= math.abs(dy) then
+        side = dx >= 0 and "right" or "left"
+      else
+        side = dy >= 0 and "down" or "up"
+      end
+    end
+  end
+
+  if not p or not rel[p.id] then p, side = nil, "right" end
+  if not p and pos then p, side = nearest_sided(clients, pos.x, pos.y) end
+  if not p then
+    for _, o in ipairs(clients) do
+      if rel[o.id] and o.id ~= c.id then p = o break end
+    end
+  end
+
+  if not p then
+    rel[c.id] = {
+      rx = (c.x - cam.ox) / cam.s,
+      ry = (c.y - cam.oy) / cam.s,
+      rw = c.width / cam.s,
+      rh = c.height / cam.s,
+      placed = false,
+    }
+    print("canvas root -> client " .. c.id)
+    io.flush()
+    return
+  end
+
+  local r = rel[p.id]
+  local rw, rh = r.rw, r.rh
+  local gw = GAP / cam.s
+  local rx, ry
+  if side == "right" then
+    rx, ry = (p.x + p.width + gw - cam.ox) / cam.s,
+             (p.y - cam.oy) / cam.s
+  elseif side == "left" then
+    rx, ry = (p.x - rw - gw - cam.ox) / cam.s,
+             (p.y - cam.oy) / cam.s
+  elseif side == "up" then
+    rx, ry = (p.x - cam.ox) / cam.s,
+             (p.y - rh - gw - cam.oy) / cam.s
+  else
+    rx, ry = (p.x - cam.ox) / cam.s,
+             (p.y + p.height + gw - cam.oy) / cam.s
+  end
+  rel[c.id] = { rx = rx, ry = ry, rw = rw, rh = rh, placed = false }
+end
+
+local function paint()
+  local clients = data(mango.get("all-clients")).clients or {}
+
+  local alive = {}
+  for _, c in ipairs(clients) do alive[c.id] = true end
+  for id in pairs(rel) do
+    if not alive[id] then rel[id] = nil end
+  end
+
+  for _, c in ipairs(clients) do
+    if not rel[c.id] and layoutable(c) then adopt(c, clients) end
+  end
+
+  for _, c in ipairs(clients) do
+    local r = rel[c.id]
+    if r and layoutable(c) then
+      local x, y, w, h = pred(r)
+      if not r.placed or not c.is_floating or cam_dirty then
+        mango.dispatch("movewin", sig(x - c.x) .. "," .. sig(y - c.y), "client," .. c.id)
+        mango.dispatch("resizewin", w .. "," .. h, "client," .. c.id)
+        r.placed = true
+      end
+    end
+  end
+  cam_dirty = false
+
+  local okf, focf = pcall(mango.get, "focusing-client")
+  if okf and focf and focf.id then last_focus = focf.id end
+end
+
+local function zoom(factor, mon)
+  local mx = mon.x + mon.width / 2
+  local my = mon.y + mon.height / 2
+  local s2 = clamp(cam.s * factor, SCALE_MIN, SCALE_MAX)
+  if s2 == cam.s then return end
+  cam.ox = mx - (mx - cam.ox) * s2 / cam.s
+  cam.oy = my - (my - cam.oy) * s2 / cam.s
+  cam.s = s2
+  cam_dirty = true
+  paint()
+end
+
+local function pan(dx, dy)
+  cam.ox = cam.ox + dx
+  cam.oy = cam.oy + dy
+  cam_dirty = true
+  paint()
+end
+
+local function reset_view(mon)
+  cam.s = 1.0
+  local minx, miny, maxx, maxy
+  for _, r in pairs(rel) do
+    local x, y, w, h = pred(r)
+    if minx == nil or x < minx then minx = x end
+    if miny == nil or y < miny then miny = y end
+    if maxx == nil or x + w > maxx then maxx = x + w end
+    if maxy == nil or y + h > maxy then maxy = y + h end
+  end
+  if minx then
+    cam.ox = mon.x + mon.width / 2 - (minx + maxx) / 2
+    cam.oy = mon.y + mon.height / 2 - (miny + maxy) / 2
+  end
+  cam_dirty = true
+  paint()
+end
+
+local function on_keymode(ev)
+  local mode = ev.keymode
+  if not mode or mode == "default" then return end
+  local mon = monitor()
+  if not mon then return end
+  if mode == "zoomin" then
+    zoom(ZOOM, mon)
+  elseif mode == "zoomout" then
+    zoom(1 / ZOOM, mon)
+  elseif mode == "panleft" then
+    pan(PAN, 0)
+  elseif mode == "panright" then
+    pan(-PAN, 0)
+  elseif mode == "panup" then
+    pan(0, PAN)
+  elseif mode == "pandown" then
+    pan(0, -PAN)
+  elseif mode == "resetview" then
+    reset_view(mon)
+  else
+    return
+  end
+  mango.dispatch("setkeymode", "default")
+end
+
+local function handle(ev)
+  if ev.clients ~= nil then
+    paint()
+  elseif ev.keymode ~= nil then
+    on_keymode(ev)
+  end
+end
+
+local csock = mango.open_watch("all-clients")
+local ksock = mango.open_watch("keymode")
+
+local function pump(sock)
+  while true do
+    local ev, err = mango.read_event(sock)
+    if ev then
+      handle(ev)
+    else
+      if err then os.exit(0) end
+      return
+    end
+  end
+end
+
+while true do
+  local ready = socket.select({ csock, ksock }, nil, nil)
+  for _, sock in ipairs(ready) do pump(sock) end
+end

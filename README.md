@@ -25,6 +25,6 @@ each demo comes with a custom layout being handled by the scriptable config.
 | --- | --- | --- |
 | ruby | brick-wall style pattern| yes |
 | guile | alternating left-to-right, then right-to-left | yes |
-| node | fibbonacci sequence master-stack layout | somewhat |
-| python | hand-of-cards layout | somewhat |
-| lua | honestly idk yet | WIP | 
+| node | fibbonacci sequence master-stack layout | yes |
+| python | hand-of-cards layout | yes |
+| lua | pseudo-infinite canvas clump | yes | 

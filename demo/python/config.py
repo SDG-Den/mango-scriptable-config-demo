@@ -49,6 +49,7 @@ for bind in [
     "Ctrl,4,view,4",
     "alt,q,killclient",
     "alt,f,togglefullscreen",
+    "alt,m,togglemaximizescreen",
 ]:
     mango.set_option("bind", bind)
 
@@ -71,26 +72,30 @@ print("watching all-clients (layout engine)")
 def fan_slots(count, mon):
     cx = mon["x"] + mon["width"] / 2
     cy = mon["y"] + mon["height"] / 2
-    w, h = 520, 420
+    k = min(mon["width"], mon["height"]) / 1080
+    w, h = round(520 * k), round(420 * k)
     r = 0.30 * min(mon["width"], mon["height"])
     span = 1.05
-    slots = []
+    margin = 10
+    half_arc = r * math.sin(span)
+    left = mon["x"] + margin + w / 2
+    right = mon["x"] + mon["width"] - margin - w / 2
+    xs = []
+    ys = []
     for i in range(count):
         a = -math.pi / 2 - span + 2 * span * i / max(count - 1, 1)
-        slots.append((cx + r * math.cos(a) - w / 2, cy + r * math.sin(a) - h / 2, w, h))
-    minx = min(s[0] for s in slots)
-    miny = min(s[1] for s in slots)
-    maxx = max(s[0] + s[2] for s in slots)
-    dx = mon["x"] + 10 - minx
-    dy = mon["y"] + 10 - miny
-    if maxx + dx > mon["x"] + mon["width"] - 10:
-        dx -= maxx + dx - (mon["x"] + mon["width"] - 10)
-    return [(round(x + dx), round(y + dy), w, h) for x, y, w, h in slots]
+        t = (r * math.cos(a) + half_arc) / (2 * half_arc)
+        xs.append(left + t * (right - left) - w / 2)
+        ys.append(cy + r * math.sin(a) - h / 2)
+    dy = mon["y"] + mon["height"] - margin - max(y + h for y in ys)
+    if min(ys) + dy < mon["y"] + margin:
+        dy = mon["y"] + margin - min(ys)
+    return [(round(x), round(y + dy), w, h) for x, y in zip(xs, ys)]
 
 
 def layout_pass():
     mons = data(mango.get("all-monitors")).get("monitors", [])
-    clients = [c for c in data(mango.get("all-clients")).get("clients", []) if not c.get("is_swallowing")]
+    clients = [c for c in data(mango.get("all-clients")).get("clients", []) if not c.get("is_swallowing") and not c.get("is_maximized")]
     clients.sort(key=lambda c: c["id"])
     if not mons or not clients:
         return
@@ -105,3 +110,4 @@ def layout_pass():
 
 
 mango.watch("all-clients", lambda event: layout_pass())
+mango.watch("all-monitors", lambda event: layout_pass())

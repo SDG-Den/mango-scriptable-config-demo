@@ -3,6 +3,8 @@ local socket = require("socket")
 local json = require("cjson")
 local M = {}
 
+local buffers = {}
+
 local function socket_path()
   local sig = os.getenv("MANGO_INSTANCE_SIGNATURE")
   if sig then return sig end
@@ -78,6 +80,43 @@ function M.watch(subject, on_event)
     end
   end
   sock:close()
+end
+
+local function next_line(sock)
+  while true do
+    local line, err, partial = sock:receive("*l")
+    if line then
+      local head = buffers[sock]
+      buffers[sock] = nil
+      if head and #head > 0 then return head .. line end
+      return line
+    end
+    if err == "timeout" then
+      local head = buffers[sock] or ""
+      buffers[sock] = head .. (partial or "")
+      return nil
+    end
+    return nil, err
+  end
+end
+
+function M.open_watch(subject)
+  local sock = M.connect()
+  local ok, err = sock:send("watch " .. subject .. "\n")
+  if not ok then sock:close() error(err) end
+  sock:settimeout(0)
+  return sock
+end
+
+function M.read_event(sock)
+  while true do
+    local line, err = next_line(sock)
+    if not line then return nil, err end
+    if line ~= "" then
+      local ok, obj = pcall(json.decode, line)
+      if ok and not obj.error then return obj end
+    end
+  end
 end
 
 return M

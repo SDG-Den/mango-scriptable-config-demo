@@ -46,6 +46,7 @@ const onFocus = (event) => {
     "Ctrl,4,view,4",
     "alt,q,killclient",
     "alt,f,togglefullscreen",
+    "alt,z,togglefloating",
   ]) {
     await mango.setOption("bind", bind);
   }
@@ -64,62 +65,129 @@ const onFocus = (event) => {
   console.log("dispatch setlayout tile -> ok");
 
   const GAP = { oh: 10, ov: 10, ih: 6, iv: 6 };
-  const DIRS = { 0: "up", 1: "right", 2: "down", 3: "left" };
 
-  // Builds the fibonacci spiral in normalized units on a golden box that starts
-  // at 1x1: each new square's side equals the box's perpendicular dimension,
-  // attached on the side given by DIRS, growing the box. Sides come out
-  // 1, 1, 2, 3, 5, 8... tiling golden rectangles (13x8, 13x21, 34x21) exactly.
-  const buildSquares = (count) => {
-    const box = { x: 0, y: 0, w: 1, h: 1 };
-    const sqs = [{ x: 0, y: 0, w: 1, h: 1 }];
-    for (let k = 1; k < count; k++) {
-      const d = DIRS[k % 4];
-      if (d === "right") {
-        sqs.push({ x: box.x + box.w, y: box.y, w: box.h, h: box.h });
-        box.w += box.h;
-      } else if (d === "down") {
-        sqs.push({ x: box.x, y: box.y + box.h, w: box.w, h: box.w });
-        box.h += box.w;
-      } else if (d === "left") {
-        sqs.push({ x: box.x - box.h, y: box.y, w: box.h, h: box.h });
-        box.x -= box.h;
-        box.w += box.h;
-      } else {
-        sqs.push({ x: box.x, y: box.y - box.w, w: box.w, h: box.w });
-        box.y -= box.w;
-        box.h += box.w;
+  // Golden-spiral dissection on a fixed 144x89 unit grid. Slots hold their
+  // position independently of the total count, so previously placed windows
+  // never move when a new one spawns. The front slot (index 0) is the 89x89
+  // square: leftmost, full height. Each square is pinned flush to its side
+  // (W,N,E,S clockwise), so a square only ever touches the previous one.
+  const GRID = { w: 144, h: 89 };
+  const SIZES = [89, 55, 34, 21, 13, 8, 5, 3, 2, 1, 1];
+  const CANON = (() => {
+    const slots = [];
+    let x = 0, y = 0, w = GRID.w, h = GRID.h;
+    for (let i = 0; i < SIZES.length; i++) {
+      const s = SIZES[i];
+      switch ("WNES"[i % 4]) {
+        case "W":
+          slots.push({ x, y, w: s, h: s });
+          x += s; w -= s;
+          break;
+        case "N":
+          slots.push({ x, y, w: s, h: s });
+          y += s; h -= s;
+          break;
+        case "E":
+          slots.push({ x: x + w - s, y, w: s, h: s });
+          w -= s;
+          break;
+        case "S":
+          slots.push({ x, y: y + h - s, w: s, h: s });
+          h -= s;
+          break;
       }
     }
-    return { sqs, box };
+    return slots;
+  })();
+
+  const area = (s) => s.w * s.h;
+
+  // Overflow rule for more than eleven windows: split the smallest square into
+  // four quadrants, keeping the first quadrant at the square's old spot. Only
+  // squares with unit side 2+ split (a 1x1 halved renders sub-pixel once the
+  // inner gap is subtracted); if none remain, new windows get no slot.
+  const buildSquares = (count) => {
+    const slots = CANON.map((s) => ({ ...s }));
+    while (slots.length < count) {
+      let idx = -1;
+      for (let i = 0; i < slots.length; i++) {
+        if (slots[i].w >= 2 && (idx === -1 || area(slots[i]) < area(slots[idx]))) {
+          idx = i;
+        }
+      }
+      if (idx === -1) break;
+      const cur = slots[idx];
+      const hw = cur.w / 2;
+      const hh = cur.h / 2;
+      const quads = [
+        { x: cur.x, y: cur.y, w: hw, h: hh },
+        { x: cur.x + hw, y: cur.y, w: hw, h: hh },
+        { x: cur.x, y: cur.y + hh, w: hw, h: hh },
+        { x: cur.x + hw, y: cur.y + hh, w: hw, h: hh },
+      ];
+      slots.splice(idx, 1, ...quads);
+    }
+    return slots.slice(0, count);
   };
 
-  // Scales the normalized spiral onto the monitor's usable area via independent
-  // X/Y scaling, so every client keeps the same stretched aspect ratio and the
-  // whole area is covered with no overlap. Rebuilding from surviving ids
-  // self-heals when windows are killed.
-  const fibSlots = (count, mon) => {
+  // Scales a unit square onto the monitor's usable area with independent X/Y
+  // scaling (every slot keeps the same stretched aspect) plus a half inner
+  // gap so adjacent windows never touch.
+  const slotOf = (q, mon) => {
     const W = mon.width - 2 * GAP.oh;
     const H = mon.height - 2 * GAP.ov;
-    const { sqs, box } = buildSquares(count);
-    return sqs.map((q) => {
-      const left = Math.round(mon.x + GAP.oh + ((q.x - box.x) * W) / box.w);
-      const top = Math.round(mon.y + GAP.ov + ((q.y - box.y) * H) / box.h);
-      const right = Math.round(mon.x + GAP.oh + ((q.x - box.x + q.w) * W) / box.w);
-      const bottom = Math.round(mon.y + GAP.ov + ((q.y - box.y + q.h) * H) / box.h);
-      return [left, top, right - left, bottom - top];
-    });
+    const left = mon.x + GAP.oh + (q.x * W) / GRID.w + GAP.ih / 2;
+    const top = mon.y + GAP.ov + (q.y * H) / GRID.h + GAP.iv / 2;
+    const right = mon.x + GAP.oh + ((q.x + q.w) * W) / GRID.w - GAP.ih / 2;
+    const bottom = mon.y + GAP.ov + ((q.y + q.h) * H) / GRID.h - GAP.iv / 2;
+    return [Math.round(left), Math.round(top), Math.round(right - left), Math.round(bottom - top)];
   };
 
+  // Chain order: index 0 is the master (biggest, leftmost slot). It mirrors
+  // mango's all-clients order initially and is then maintained by the script
+  // (prune dead ids, append new ones, move zoom targets to the front).
+  let order = null;
+  let pendingZoom = null;
+
   const layout = async () => {
-    const mons = data(await mango.get("all-monitors")).monitors;
-    const clients = (data(await mango.get("all-clients")).clients || []).filter((c) => !c.is_swallowing).sort((a, b) => a.id - b.id);
+    const mons = (data(await mango.get("all-monitors")).monitors || []);
+    const clients = (data(await mango.get("all-clients")).clients || []).filter(
+      (c) => !c.is_swallowing
+    );
     if (!mons.length || !clients.length) return;
     const mon = mons[0];
-    const slots = fibSlots(clients.length, mon);
-    for (let i = 0; i < clients.length; i++) {
-      const c = clients[i];
-      const [x, y, w, h] = slots[i];
+    const byId = Object.fromEntries(clients.map((c) => [c.id, c]));
+    const ids = new Set(clients.map((c) => c.id));
+
+    // A client that left floating state is the zoom signal: pull it to front.
+    if (pendingZoom) {
+      const cur = byId[pendingZoom];
+      if (!cur || cur.is_floating) pendingZoom = null;
+    }
+    const zoomTarget = clients.find((c) => !c.is_floating && c.id !== pendingZoom);
+    if (zoomTarget) {
+      pendingZoom = zoomTarget.id;
+      console.log(`zoom -> front: client ${zoomTarget.id}`);
+      order = order
+        ? [zoomTarget.id, ...order.filter((id) => id !== zoomTarget.id)]
+        : [zoomTarget.id];
+      await mango.dispatch("togglefloating", "client," + zoomTarget.id);
+    }
+
+    // Maintain the chain: keep surviving ids in place, append unknowns.
+    if (order) {
+      order = order.filter((id) => ids.has(id));
+      for (const c of clients) {
+        if (!order.includes(c.id)) order.push(c.id);
+      }
+    } else {
+      order = clients.map((c) => c.id);
+    }
+
+    const slots = buildSquares(order.length);
+    for (let i = 0; i < order.length && i < slots.length; i++) {
+      const c = byId[order[i]];
+      const [x, y, w, h] = slotOf(slots[i], mon);
       if (c.x !== x || c.y !== y || c.width !== w || c.height !== h) {
         await mango.dispatch("movewin", x + "," + y, "client," + c.id);
         await mango.dispatch("resizewin", w + "," + h, "client," + c.id);
