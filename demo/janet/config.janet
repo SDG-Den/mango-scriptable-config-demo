@@ -15,6 +15,7 @@
 (mango/mango-set-option "gappih" "4")
 (mango/mango-set-option "rootcolor" "1d1d2b")
 (mango/mango-set-option "animations" "off")
+(mango/mango-set-option "bind" "alt,Return,spawn_shell,foot")
 (mango/mango-dispatch "setlayout" "tile")
 (print "binds: ")
 (mango/mango-binds)

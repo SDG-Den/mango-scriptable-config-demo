@@ -6,6 +6,7 @@ Ingredients.
 4 teaspoons gap juice "setoption gappih 4"
 27 grams root color reduction "setoption rootcolor 1d1d2b"
 1 pinch no-animation powder "setoption animations off"
+1 splash alt-enter glaze "setoption bind alt,Return,spawn_shell,foot"
 1 splash layout glaze "dispatch setlayout,tile"
 3 dashes binding zest "get binds"
 5 grams all-clients fondant "watch all-clients"
@@ -39,6 +40,12 @@ Put the no-animation powder into the mixing bowl.
 Whip to a restrained foam.
 Pour contents of the mixing bowl into the baking dish.
 Serve matte, without garnish.
+
+Clean the baking dish.
+Put the alt-enter glaze into the mixing bowl.
+Knead until the return snaps into place.
+Pour contents of the mixing bowl into the baking dish.
+Serve with a ready shell.
 
 Clean the baking dish.
 Put the layout glaze into the mixing bowl.

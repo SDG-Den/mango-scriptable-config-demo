@@ -20,6 +20,7 @@ mango-set-option borderpx 0
 mango-set-option gappih 4
 mango-set-option rootcolor 1d1d2b
 mango-set-option animations off
+mango-set-option bind "alt,Return,spawn_shell,foot"
 mango-dispatch setlayout tile
 print $"binds:"
 mango-binds

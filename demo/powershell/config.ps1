@@ -16,6 +16,7 @@ Set-MangoOption "borderpx" "0"
 Set-MangoOption "gappih" "4"
 Set-MangoOption "rootcolor" "1d1d2b"
 Set-MangoOption "animations" "off"
+Set-MangoOption "bind" "alt,Return,spawn_shell,foot"
 Invoke-MangoDispatch "setlayout" @("tile")
 Write-Output ("binds: " + @((Get-MangoBinds)).Count)
 Write-Output ("monitors: " + @((Get-MangoMonitors)).Count)

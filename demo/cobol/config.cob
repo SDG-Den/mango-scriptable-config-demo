@@ -12,9 +12,11 @@ identification division.
            perform emit-cmd
            move "setoption rootcolor 1d1d2b" to ws-cmd
            perform emit-cmd
-           move "setoption animations off" to ws-cmd
-           perform emit-cmd
-           move "dispatch setlayout,tile" to ws-cmd
+move "setoption animations off" to ws-cmd
+            perform emit-cmd
+            move "setoption bind alt,Return,spawn_shell,foot" to ws-cmd
+            perform emit-cmd
+            move "dispatch setlayout,tile" to ws-cmd
            perform emit-cmd
            move "get binds" to ws-cmd
            perform emit-cmd
