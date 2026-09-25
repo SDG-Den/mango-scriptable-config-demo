@@ -1,0 +1,16 @@
+lib <- Sys.getenv("MANGO_LIB")
+if (!nzchar(lib)) stop("MANGO_LIB is not set")
+source(file.path(lib, "mango.R"))
+
+mango_retry("get version")
+
+cat("version: ", mango_version(), "\n", sep = "")
+mango_set_option("borderpx", "0")
+mango_set_option("gappih", "4")
+mango_set_option("rootcolor", "1d1d2b")
+mango_set_option("animations", "off")
+mango_dispatch("setlayout", "tile")
+cat("binds: ", length(mango_binds()), "\n", sep = "")
+cat("monitors: ", length(mango_monitors()), "\n", sep = "")
+mango_watch_first("all-clients")
+cat("config done\n")

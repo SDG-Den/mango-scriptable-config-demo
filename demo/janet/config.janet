@@ -1,0 +1,22 @@
+(def lib-dir (or (os/getenv "MANGO_LIB") (error "MANGO_LIB is not set")))
+(import* (string lib-dir "/mango.janet"))
+
+(var ok false)
+(for i 0 50
+  (if (= (mango/mango-get "version") 0)
+    (do (set ok true) (break))
+    (os/sleep 0.1)))
+(if (not ok)
+  (do (eprint "mango not reachable") (os/exit 1)))
+
+(print "version: ")
+(mango/mango-version)
+(mango/mango-set-option "borderpx" "0")
+(mango/mango-set-option "gappih" "4")
+(mango/mango-set-option "rootcolor" "1d1d2b")
+(mango/mango-set-option "animations" "off")
+(mango/mango-dispatch "setlayout" "tile")
+(print "binds: ")
+(mango/mango-binds)
+(mango/mango-watch-first "all-clients")
+(print "config done")

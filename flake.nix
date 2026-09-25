@@ -1,5 +1,5 @@
 {
-  description = "Scriptable mango compositor config demo (python, ruby, node, lua, guile)";
+  description = "Scriptable mango compositor config demo (18 langs)";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
@@ -22,6 +22,19 @@
         "node"
         "lua"
         "guile"
+        "php"
+        "janet"
+        "r"
+        "racket"
+        "powershell"
+        "bash"
+        "zsh"
+        "fish"
+        "nushell"
+        "chef"
+        "cobol"
+        "fortran"
+        "emojicode"
       ];
       forAllSystems = nixpkgs.lib.genAttrs systems;
     in

@@ -1,0 +1,59 @@
+🐇 🥭 🍇
+  🖍🆕 calls 🔢
+
+  🆕 🍇
+    0 ➡️ 🖍calls
+  🍉
+
+  ❗️ 📰 cmd 🔡 🍇
+    😀 cmd❗️
+  🍉
+
+  ❗️ 🛎 mode 🔡 mods 🔡 keysym 🔡 cmd 🔡 🍇
+    😀 🍪 🔤dispatch setup_bind,🔤 mode 🔤,🔤 mods 🔤,🔤 keysym 🔤,🔤 cmd 🍪❗️
+  🍉
+
+  ❗️ 📋 match 🔡 prop 🔡 🍇
+    😀 🍪 🔤dispatch setup_rule,🔤 match 🔤,🔤 prop 🍪❗️
+  🍉
+
+  ❗️ 🏷 cls 🔡 prop 🔡 🍇
+    😀 🍪 🔤dispatch setup_rule,class=🔤 cls 🔤,🔤 prop 🍪❗️
+  🍉
+
+  ❗️ 📐 layout 🔡 🍇
+    😀 🍪 🔤dispatch setlayout,🔤 layout 🍪❗️
+  🍉
+
+  ❗️ 🌓 🍇
+    calls ➕ 1 ➡️ 🖍calls
+    ↪️ calls 🚮 2 🙌 1 🍇
+      😀 🔤dispatch setlayout,tile🔤❗️
+    🍉
+    ↪️ calls 🚮 2 🙌 0 🍇
+      😀 🔤dispatch setlayout,dwindle🔤❗️
+    🍉
+  🍉
+
+  ❗️ 🌶 px 🔡 color 🔡 🍇
+    😀 🍪 🔤setoption borderpx 🔤 px 🍪❗️
+    😀 🍪 🔤setoption bordercolor 🔤 color 🍪❗️
+  🍉
+
+  ❗️ 🕳 h 🔡 v 🔡 🍇
+    😀 🍪 🔤setoption gappih 🔤 h 🍪❗️
+    😀 🍪 🔤setoption gappiv 🔤 v 🍪❗️
+  🍉
+
+  ❗️ 🎨 hex 🔡 px 🔡 🍇
+    😀 🍪 🔤setoption rootcolor 🔤 hex 🍪❗️
+    😀 🍪 🔤setoption bordercolor 🔤 hex 🍪❗️
+    😀 🍪 🔤setoption borderpx 🔤 px 🍪❗️
+  🍉
+
+  ❗️ 🏙 🍇
+    😀 🔤get version🔤❗️
+    😀 🔤get all-monitors🔤❗️
+    😀 🔤get options🔤❗️
+  🍉
+🍉

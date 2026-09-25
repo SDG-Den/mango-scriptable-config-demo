@@ -4,7 +4,7 @@ this repo uses a branch of mangoWM that extends the IPC to allow fully scriptabl
 
 The demo's and libs in this repo *are* vibe-coded, and should serve as a concept piece and inspiration for actual devs to write actual libraries. 
 
-
+this repo may be extended with more demo libs over time, just for funsies.
 
 ## Try it
 
@@ -19,7 +19,7 @@ the socket path from `MANGO_INSTANCE_SIGNATURE`:
 and a `mango-demo` binary that launches it with `minimal.conf`.
 
 
-each demo comes with a custom layout being handled by the scriptable config.
+some demos come with a custom layout being handled by the scriptable config.
 
 | lang | layout style | functional? |
 | --- | --- | --- |
@@ -27,4 +27,18 @@ each demo comes with a custom layout being handled by the scriptable config.
 | guile | alternating left-to-right, then right-to-left | yes |
 | node | fibbonacci sequence master-stack layout | yes |
 | python | hand-of-cards layout | yes |
-| lua | pseudo-infinite canvas clump | yes | 
+| lua | pseudo-infinite auto-tiling canvas | yes | 
+| php | - | yes |
+| janet | - | yes |
+| r | - | yes |
+| racket | - | yes |
+| powershell | - | yes |
+| bash | - | yes |
+| zsh | - | yes |
+| fish | - | yes |
+| nushell | - | yes |
+| chef | - | yes |
+| cobol | - | yes |
+| fortran | - | yes |
+| emojicode | - | yes |
+
